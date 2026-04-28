@@ -1,0 +1,185 @@
+# =============================================================================
+# LadderLogicReview — Rule Configuration
+# =============================================================================
+#
+# Local rules are checked instantly offline by the built-in rule engine.
+# Each rule name must have a matching check_<name>() function in builtin.py.
+#
+# Claude rules are plain-English instructions sent to the Claude API when
+# --deep is used. Add any rule here in plain language — no code required.
+#
+# Severity levels: error | warning | info
+# =============================================================================
+
+rules:
+
+  # ---------------------------------------------------------------------------
+  # Documentation
+  # ---------------------------------------------------------------------------
+
+  - id: R001
+    name: missing_rung_comment
+    severity: warning
+    enabled: true
+    description: >
+      Every rung must have a comment or description explaining its purpose.
+      Uncommented rungs make programs difficult to maintain and audit.
+
+  - id: R005
+    name: variable_missing_comment
+    severity: info
+    enabled: true
+    description: >
+      Every variable in the symbol table should have a descriptive comment.
+      Raw addresses with no context are a maintenance hazard.
+
+  - id: R006
+    name: timer_counter_no_comment
+    severity: warning
+    enabled: true
+    description: >
+      Rungs containing timer or counter instructions must have a comment
+      explaining the setpoint value and the purpose of the timing/counting.
+
+  # ---------------------------------------------------------------------------
+  # Output coil hygiene
+  # ---------------------------------------------------------------------------
+
+  - id: R002
+    name: duplicate_output_coil
+    severity: error
+    enabled: true
+    description: >
+      The same output coil address (OT/OUT) must not appear in more than one
+      rung within a POU. Only the last rung's result takes effect; earlier
+      rungs are silently overridden, which is almost always a logic bug.
+
+  - id: R007
+    name: output_contact_same_rung
+    severity: warning
+    enabled: true
+    description: >
+      An output coil address appearing as a contact in the same rung creates
+      a self-seal (latch) pattern. This should be verified as intentional.
+      Unintentional latches prevent outputs from de-energising.
+
+  - id: R009
+    name: output_used_as_contact
+    severity: info
+    enabled: true
+    description: >
+      A Y-address (physical output) read as a contact with no named variable
+      alias indicates undocumented output feedback. This pattern should be
+      explicit and documented.
+
+  - id: R010
+    name: rung_no_output
+    severity: warning
+    enabled: true
+    description: >
+      A rung that contains contact logic but no output instruction evaluates
+      a condition but drives nothing. This is usually either dead code or a
+      missing output instruction.
+
+  # ---------------------------------------------------------------------------
+  # Address safety
+  # ---------------------------------------------------------------------------
+
+  - id: R003
+    name: direct_physical_address
+    severity: info
+    enabled: true
+    description: >
+      Physical addresses (X, Y, R, DT, etc.) used without a named variable
+      alias reduce readability and make global search-and-replace impossible.
+      Prefer named variables in the symbol table.
+
+  - id: R004
+    name: system_register_write
+    severity: error
+    enabled: true
+    description: >
+      Writing to system data registers (DT9000+) or special internal relays
+      (R900+) can overwrite PLC system settings and cause unexpected behaviour.
+      These addresses should be treated as read-only unless the intent is
+      explicitly documented.
+
+  # ---------------------------------------------------------------------------
+  # Code quality
+  # ---------------------------------------------------------------------------
+
+  - id: R008
+    name: empty_rung
+    severity: warning
+    enabled: true
+    description: >
+      An empty rung (no instructions) is dead code. Remove it or add the
+      intended logic.
+
+
+# =============================================================================
+# Claude deep-analysis rules (--deep flag required)
+#
+# Write these in plain English. Claude will receive your program text and
+# check it against every rule in this list.
+# Add, remove, or reword entries freely — no code changes needed.
+# =============================================================================
+
+claude_rules:
+
+  # Safety interlocks
+  - >
+    Flag any motor or actuator output (Y-address) that can be energised without
+    a corresponding overload, fault, or emergency-stop interlock contact in the
+    rung or in a preceding permissive rung.
+
+  - >
+    Identify any latching (SET/RST or self-seal) logic where the reset condition
+    is missing, unreachable, or can only be triggered by a condition that is
+    always false.
+
+  - >
+    Flag rungs where a timer's done-bit (T contact) is the sole permissive for
+    energising a critical output — a timer done-bit alone is not a reliable
+    safety interlock.
+
+  # Logic errors
+  - >
+    Identify any rung where the contact logic can never evaluate to TRUE
+    (e.g. a normally-open and normally-closed contact on the same address in
+    series, or a condition that is logically impossible given the program
+    structure).
+
+  - >
+    Flag outputs that can never be de-energised once set (no reset path exists
+    and no RST/coil instruction appears elsewhere in the program for that address).
+
+  - >
+    Identify counter or timer preset values that are zero or negative, which
+    would cause the timer/counter to immediately reach its done-state.
+
+  # Bad practices
+  - >
+    Flag rungs that are excessively complex (more than 8–10 contacts/coils in
+    series or parallel). Complex rungs should be broken into sub-rungs with
+    intermediate internal relays (R-addresses) for readability.
+
+  - >
+    Identify any use of numeric constants (K values) directly in the program
+    body where a named DT register or symbolic constant would be more
+    maintainable. Flag the specific value and its rung.
+
+  - >
+    Flag any rung comment that is a copy-paste duplicate of another rung's
+    comment — duplicate comments suggest one of the rungs was not properly
+    documented after being copied.
+
+  # Documentation
+  - >
+    Flag any POU that has no description or header comment explaining its
+    overall purpose.
+
+  - >
+    Identify variables whose name is a single letter, a generic abbreviation
+    (tmp, var, bit, flag), or otherwise non-descriptive. These should be
+    renamed to reflect their physical or functional meaning.

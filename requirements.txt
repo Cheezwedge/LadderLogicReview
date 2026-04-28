@@ -1,0 +1,12 @@
+# Runtime dependencies
+anthropic>=0.40.0
+click>=8.1
+rich>=13.0
+pyyaml>=6.0
+
+# Build / packaging (optional)
+pyinstaller>=6.0
+
+# Development / testing (optional)
+pytest>=8.0
+pytest-mock>=3.0

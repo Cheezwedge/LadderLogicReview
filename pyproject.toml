@@ -1,0 +1,33 @@
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.backends.legacy:build"
+
+[project]
+name = "ladder-logic-review"
+version = "0.1.0"
+description = "Static analyser for Panasonic FPWin Pro 7 ladder logic (.asc) files"
+requires-python = ">=3.10"
+dependencies = [
+    "anthropic>=0.40.0",
+    "click>=8.1",
+    "rich>=13.0",
+    "pyyaml>=6.0",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pyinstaller>=6.0",
+    "pytest>=8.0",
+    "pytest-mock>=3.0",
+]
+
+[project.scripts]
+llr = "llr.cli:main"
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["llr*"]
+
+[tool.setuptools.package-data]
+"llr" = ["py.typed"]
+"" = ["rules.yaml"]
