@@ -1,0 +1,68 @@
+name: Build & Release
+
+on:
+  push:
+    tags:
+      - "v*"
+
+permissions:
+  contents: write
+
+jobs:
+  build-windows:
+    name: Windows .exe
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install dependencies
+        run: |
+          pip install -r requirements.txt
+          pip install pyinstaller
+
+      - name: Build executable
+        run: pyinstaller llr.spec
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: llr-windows
+          path: dist/llr.exe
+
+  release:
+    name: Create GitHub Release
+    needs: build-windows
+    runs-on: ubuntu-latest
+    steps:
+      - name: Download Windows artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: llr-windows
+
+      - name: Create release and upload asset
+        uses: softprops/action-gh-release@v2
+        with:
+          name: "LadderLogicReview ${{ github.ref_name }}"
+          body: |
+            ## LadderLogicReview ${{ github.ref_name }}
+
+            Standalone Windows CLI for reviewing Panasonic FPWin Pro 7 ladder logic exports.
+
+            ### Usage
+            Download `llr.exe` and run from a command prompt — no Python required.
+
+            ```cmd
+            llr.exe review C:\path\to\yourprogram.asc
+            llr.exe review C:\path\to\yourprogram.asc --output report.html
+            llr.exe review C:\path\to\yourprogram.asc --deep --api-key sk-ant-...
+            ```
+
+            See `QUICKSTART.md` for full documentation.
+          files: llr.exe
+          draft: false
+          prerelease: false
