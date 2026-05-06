@@ -47,6 +47,9 @@ class Instruction:
     @property
     def address_type(self) -> AddressType:
         op = self.operand.upper()
+        # Struct member access (e.g. FaultsDUT.MAIN_SEQUENCE_FAULT) → named variable
+        if "." in op:
+            return AddressType.VARIABLE
         for at in (AddressType.DDT, AddressType.WX, AddressType.WY,
                    AddressType.WR, AddressType.WL, AddressType.FL):
             if op.startswith(at.value):
@@ -64,18 +67,30 @@ class Instruction:
 
     @property
     def is_output(self) -> bool:
-        return self.mnemonic.upper() in {"OT", "OUT", "ST", "SET", "RST",
-                                         "KP", "KEEP", "TM", "CT", "TMX",
-                                         "TMY", "TMR", "STC", "STP"}
+        # OT/OUT/SET/RST = coil outputs
+        # F/FB/VAROUT = function calls and data writes (count as outputs for R010)
+        # TM/CT variants = timer/counter coils
+        return self.mnemonic.upper() in {
+            "OT", "OUT", "SET", "RST", "KP", "KEEP",
+            "TM", "CT", "TMX", "TMY", "TMR", "STC", "STP",
+            "F", "FB", "VAROUT",
+        }
 
     @property
     def is_coil(self) -> bool:
+        # Strict coil outputs — used for duplicate-coil detection (R002)
         return self.mnemonic.upper() in {"OT", "OUT", "SET", "RST", "KP", "KEEP"}
 
     @property
     def is_contact(self) -> bool:
-        return self.mnemonic.upper() in {"LD", "ST", "AN", "AND", "OR", "ANS",
-                                         "ORS", "PSHS", "POPS", "ANB", "ORB"}
+        # LD   = normally open (NO) contact
+        # LDN  = normally closed (NC) contact
+        # LDP  = rising-edge contact
+        # LDF  = falling-edge contact
+        return self.mnemonic.upper() in {
+            "LD", "LDN", "LDP", "LDF",
+            "AN", "AND", "OR", "ANS", "ORS", "PSHS", "POPS", "ANB", "ORB",
+        }
 
 
 @dataclass
