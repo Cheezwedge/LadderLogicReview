@@ -248,6 +248,23 @@ def rules_validate(rules_path: Optional[str]) -> None:
 
 
 # ---------------------------------------------------------------------------
+# llr web
+# ---------------------------------------------------------------------------
+
+@cli.command()
+@click.option("--port", default=8080, show_default=True, help="Port to listen on.")
+@click.option("--host", default="127.0.0.1", show_default=True, help="Host to bind to.")
+@click.option("--no-browser", is_flag=True, default=False, help="Don't open the browser automatically.")
+def web(port: int, host: str, no_browser: bool) -> None:
+    """Start the browser-based UI at http://localhost:PORT."""
+    from .web import run as _run_web
+    url = f"http://{host}:{port}"
+    console.print(f"[green]LadderLogicReview web UI → [bold]{url}[/bold][/green]")
+    console.print("[dim]Press Ctrl+C to stop.[/dim]")
+    _run_web(host=host, port=port, open_browser=not no_browser)
+
+
+# ---------------------------------------------------------------------------
 # Entry point (also used by PyInstaller)
 # ---------------------------------------------------------------------------
 

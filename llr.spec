@@ -20,10 +20,15 @@ a = Analysis(
     ],
     hiddenimports=[
         "llr.rules.builtin",          # dynamically imported by engine
+        "llr.web",
         "anthropic",
         "yaml",
         "click",
         "rich",
+        "flask",
+        "werkzeug",
+        "jinja2",
+        "itsdangerous",
     ],
     hookspath=[],
     hooksconfig={},
