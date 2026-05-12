@@ -31,4 +31,3 @@ include = ["llr*"]
 
 [tool.setuptools.package-data]
 "llr" = ["py.typed"]
-"" = ["rules.yaml"]
