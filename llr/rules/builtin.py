@@ -9,6 +9,7 @@ New checks added here are automatically discovered by the engine as long as
 a matching entry exists in rules.yaml.
 """
 from __future__ import annotations
+import re
 from collections import defaultdict
 from typing import TYPE_CHECKING
 
@@ -263,8 +264,95 @@ def check_output_used_as_contact(program: Program, rule: "RuleDescriptor") -> li
 
 
 # ---------------------------------------------------------------------------
-# R010 — no output instructions in a rung (contacts only, nothing driven)
+# R011 — test/bypass bits left in production code
 # ---------------------------------------------------------------------------
+
+_BYPASS_KEYWORDS = ("bypass", "debug", "dummy", "placeholder", "tempvar", "testbit", "forcebit")
+_TEMP_PATTERN = re.compile(r'(^|[^a-z])(temp|tmp)(\d*$|[^a-z])', re.IGNORECASE)
+
+def check_test_bypass_bit(program: Program, rule: "RuleDescriptor") -> list[Finding]:
+    findings = []
+    seen: set[tuple] = set()
+
+    def _is_suspect(name: str) -> bool:
+        n = name.lower()
+        if any(kw in n for kw in _BYPASS_KEYWORDS):
+            return True
+        if _TEMP_PATTERN.search(name):
+            return True
+        return False
+
+    for pou_name, rung in program.all_rungs:
+        for instr in rung.instructions:
+            operand = instr.operand
+            if not operand or not _is_suspect(operand):
+                continue
+            key = (pou_name, rung.number, operand)
+            if key in seen:
+                continue
+            seen.add(key)
+            findings.append(Finding(
+                rule_id=rule.id,
+                rule_name=rule.name,
+                severity=rule.severity,
+                message=(
+                    f"'{operand}' in rung {rung.number} looks like a test or temporary "
+                    f"bypass bit. Verify it has been removed before deploying to production."
+                ),
+                pou_name=pou_name,
+                rung_number=rung.number,
+            ))
+
+    # Also check the symbol table for suspect variable names
+    for var in program.all_variables:
+        if _is_suspect(var.name):
+            findings.append(Finding(
+                rule_id=rule.id,
+                rule_name=rule.name,
+                severity=rule.severity,
+                message=(
+                    f"Variable '{var.name}' looks like a test or temporary variable "
+                    f"that may have been left in from debugging."
+                ),
+                variable_name=var.name,
+            ))
+
+    return findings
+
+
+# ---------------------------------------------------------------------------
+# R012 — SET coil with no corresponding RST anywhere in the program
+# ---------------------------------------------------------------------------
+
+def check_set_without_reset(program: Program, rule: "RuleDescriptor") -> list[Finding]:
+    findings = []
+    for pou in program.pous:
+        set_rungs:  dict[str, list[int]] = defaultdict(list)
+        rst_operands: set[str] = set()
+
+        for rung in pou.rungs:
+            for instr in rung.instructions:
+                m = instr.mnemonic.upper()
+                if m == "SET":
+                    set_rungs[instr.operand].append(rung.number)
+                elif m == "RST":
+                    rst_operands.add(instr.operand)
+
+        for operand, rung_nums in set_rungs.items():
+            if operand and operand not in rst_operands:
+                findings.append(Finding(
+                    rule_id=rule.id,
+                    rule_name=rule.name,
+                    severity=rule.severity,
+                    message=(
+                        f"'{operand}' is SET in rung(s) {rung_nums} but never RST "
+                        f"anywhere in POU '{pou.name}'. If this bit commands motion or "
+                        f"starts a sequence, ensure it is reset on safety trip or re-init."
+                    ),
+                    pou_name=pou.name,
+                    rung_number=rung_nums[0],
+                ))
+    return findings
 
 def check_rung_no_output(program: Program, rule: "RuleDescriptor") -> list[Finding]:
     findings = []

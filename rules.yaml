@@ -116,6 +116,25 @@ rules:
       An empty rung (no instructions) is dead code. Remove it or add the
       intended logic.
 
+  - id: R011
+    name: test_bypass_bit
+    severity: warning
+    enabled: true
+    description: >
+      Flags operands or variables whose names suggest they are test or
+      temporary bypass bits left over from debugging (e.g. names containing
+      'bypass', 'debug', 'dummy', 'temp', 'tmp', 'testbit', 'forcebit').
+      These must be removed before deploying to production.
+
+  - id: R012
+    name: set_without_reset
+    severity: warning
+    enabled: true
+    description: >
+      A SET coil that has no corresponding RST instruction anywhere in the
+      same POU may never be cleared. Any bit that commands motion or starts
+      a sequence must have a reset path on safety trip or re-initialisation.
+
 
 # =============================================================================
 # Claude deep-analysis rules (--deep flag required)
@@ -173,6 +192,53 @@ claude_rules:
     Flag any rung comment that is a copy-paste duplicate of another rung's
     comment — duplicate comments suggest one of the rungs was not properly
     documented after being copied.
+
+  # Handshaking and station timing
+  - >
+    Check for proper handshaking between stations or devices. When one station
+    or device signals completion (e.g. a done bit, an acknowledge bit, or a
+    step transition), verify that the receiving station or sequence has a
+    corresponding interlocked contact before proceeding. Flag any step
+    transition or output that acts on a done/complete signal without first
+    confirming the downstream device is ready or has acknowledged.
+
+  - >
+    Identify any logic where the correct operation depends on a specific number
+    of PLC scan cycles elapsing, or where a rising-edge contact (LDP/positive
+    transition) is used to count time or sequence steps rather than to detect
+    a genuine state change. Flag any counter used as a scan-time delay and any
+    assumption that a single scan guarantees a bit has been seen or processed.
+    All timing should use timer instructions with explicit setpoints, not
+    scan-cycle counting.
+
+  - >
+    Check that stations or devices intended to run in parallel with the main
+    sequence or indexer system — such as upstream part-loading, part-feeding,
+    labelling, or vision systems — cannot be inadvertently stopped when the
+    main sequence pauses, waits for a step to complete, or enters a hold state.
+    Flag any parallel station whose enable or run permissive is gated directly
+    by a main-sequence step bit or a main-sequence run flag, where a pause in
+    the main sequence would de-energise the parallel station mid-cycle.
+
+  # Safety reset coverage
+  - >
+    Review all SET coils that command motion, start a sequence, or enable an
+    actuator. For each one, verify that a corresponding RST or de-energise path
+    exists that is triggered when: (1) the safety circuit is tripped or the
+    E-stop is activated, (2) the main sequence is re-initialised or reset to
+    step 0, and (3) a fault condition is detected. Flag any SET bit that
+    commands physical movement and lacks at least one of these three reset
+    conditions.
+
+  # Test and debug remnants
+  - >
+    Look for logic that appears to have been left in from testing or
+    commissioning: contacts wired directly to a hardcoded TRUE or FALSE
+    condition (e.g. a normally-closed contact on a bit that is always SET, or
+    a normally-open contact on a bit that is never driven), rungs with comments
+    containing words like 'test', 'temp', 'bypass', 'debug', 'remove',
+    'TODO', or 'FIXME', and any rung that is clearly disabled by an
+    unconditional FALSE contact at the start of the rung logic.
 
   # Documentation
   - >
