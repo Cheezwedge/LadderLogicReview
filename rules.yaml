@@ -240,6 +240,35 @@ claude_rules:
     'TODO', or 'FIXME', and any rung that is clearly disabled by an
     unconditional FALSE contact at the start of the rung logic.
 
+  # Data type and arithmetic safety
+  - >
+    Double-word into single-word: Check every data-move or assignment where the
+    source is a double word (DINT / DWORD / REAL — 32-bit) and the destination
+    is a single word (INT / WORD / UINT — 16-bit). Moving a 32-bit value into a
+    16-bit destination truncates the upper word and silently corrupts the value.
+    Cross-reference the variable types in the symbol table against the operands
+    of every move (F0_MV / MOVE / :=), copy, and math instruction. Flag each
+    mismatch with the specific source, destination, and rung.
+
+  - >
+    Divide-by-zero: Check every division instruction (F32_DIV, F31 %, DIV, the
+    '/' operator, or any scaling/ratio function block that divides). For each
+    divisor, verify it is provably non-zero — either a non-zero constant, or a
+    variable that is guarded by a preceding contact/comparison that guarantees
+    it cannot be zero at the time of the divide. Flag any divide whose divisor
+    is a variable, a data register, or an input that has no zero-check
+    protecting it, since a zero divisor causes a PLC operation error.
+
+  - >
+    String format integrity: In Panasonic FPWin Pro, a STRING data type stores
+    its maximum length in the first word and its current length in the second
+    word, with character data starting at the third word. Flag any instruction
+    that writes or moves a value into the first two words of a STRING variable
+    (e.g. indexing into the string's underlying words, or a word-level move
+    whose destination overlaps the length header), because overwriting the
+    max-length or current-length words corrupts the string and can cause
+    downstream string operations to read garbage or overrun.
+
   # Documentation
   - >
     Flag any POU that has no description or header comment explaining its
