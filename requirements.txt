@@ -11,3 +11,7 @@ pyinstaller>=6.0
 # Development / testing (optional)
 pytest>=8.0
 pytest-mock>=3.0
+
+# tools/html_to_md.py — converting HTML help files to Markdown (optional)
+beautifulsoup4>=4.12
+markdownify>=0.13
