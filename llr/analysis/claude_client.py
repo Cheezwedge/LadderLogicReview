@@ -10,7 +10,9 @@ Use --model claude-opus-4-7 for the most thorough analysis.
 from __future__ import annotations
 import json
 import os
+import sys
 import textwrap
+from pathlib import Path
 from typing import Optional
 
 import anthropic
@@ -19,6 +21,28 @@ from ..models import Program
 from ..rules.engine import Finding, Severity
 
 _DEFAULT_MODEL = "claude-sonnet-4-6"
+
+
+def _reference_doc() -> str:
+    """
+    Load the condensed FPWin Pro instruction reference.
+
+    Searched next to the PyInstaller bundle first (sys._MEIPASS), then relative
+    to the package. Returns "" if not found — analysis still works without it,
+    just with less precise instruction naming.
+    """
+    candidates = []
+    bundle = getattr(sys, "_MEIPASS", None)
+    if bundle:
+        candidates.append(Path(bundle) / "docs" / "fpwin_reference.md")
+    candidates.append(Path(__file__).parent.parent.parent / "docs" / "fpwin_reference.md")
+
+    for path in candidates:
+        try:
+            return path.read_text(encoding="utf-8")
+        except OSError:
+            continue
+    return ""
 
 _SYSTEM_PROMPT = textwrap.dedent("""\
     You are an expert PLC (Programmable Logic Controller) engineer specialising in
@@ -36,16 +60,11 @@ _SYSTEM_PROMPT = textwrap.dedent("""\
     - Missing documentation (rungs or variables that need comments to be maintainable)
     - Any issues from the specific rule list provided
 
-    ## Panasonic FP address types
-    - X / WX  : external input relays (bit / word)
-    - Y / WY  : external output relays (bit / word)
-    - R / WR  : internal relays (bit / word)
-    - DT      : data registers (16-bit word)
-    - DDT     : double data registers (32-bit)
-    - T / TM  : timers
-    - C / CT  : counters
-    - DT9000+ : special system data registers (dangerous to write)
-    - R900+   : special system internal relays (read-only in most cases)
+    An FPWin Pro instruction reference follows this prompt. Use the exact
+    instruction names from it when describing findings — do not invent or guess
+    instruction names. The `D` prefix on a mnemonic (F1_DMV, F21_DADD, F33_DDIV)
+    means a 32-bit operand, `F` means REAL, and `B` means BCD; these prefixes are
+    the primary signal for detecting data-width mismatches.
 
     ## Output format
     Respond with a JSON array of findings. Each finding must have:
@@ -93,13 +112,21 @@ class ClaudeClient:
         rules_block = self._rules_block(claude_rules)
         user_message = f"{rules_block}\n\n## Program\n\n```\n{program_text}\n```"
 
+        system_text = _SYSTEM_PROMPT
+        reference = _reference_doc()
+        if reference:
+            system_text = (
+                f"{_SYSTEM_PROMPT}\n\n"
+                f"# FPWin Pro instruction reference\n\n{reference}"
+            )
+
         response = self._client.messages.create(
             model=self._model,
             max_tokens=4096,
             system=[
                 {
                     "type": "text",
-                    "text": _SYSTEM_PROMPT,
+                    "text": system_text,
                     "cache_control": {"type": "ephemeral"},
                 }
             ],

@@ -16,7 +16,8 @@ a = Analysis(
     pathex=[str(Path(".").resolve())],
     binaries=[],
     datas=[
-        ("rules.yaml", "."),          # bundle rules.yaml next to the exe
+        ("rules.yaml", "."),                        # bundle rules.yaml next to the exe
+        ("docs/fpwin_reference.md", "docs"),        # instruction reference for --deep
     ],
     hiddenimports=[
         "llr.rules.builtin",          # dynamically imported by engine

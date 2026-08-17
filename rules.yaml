@@ -243,31 +243,40 @@ claude_rules:
   # Data type and arithmetic safety
   - >
     Double-word into single-word: Check every data-move or assignment where the
-    source is a double word (DINT / DWORD / REAL — 32-bit) and the destination
-    is a single word (INT / WORD / UINT — 16-bit). Moving a 32-bit value into a
-    16-bit destination truncates the upper word and silently corrupts the value.
-    Cross-reference the variable types in the symbol table against the operands
-    of every move (F0_MV / MOVE / :=), copy, and math instruction. Flag each
-    mismatch with the specific source, destination, and rung.
+    source is a double word (DINT / DWORD / REAL / TIME — 32-bit or wider) and
+    the destination is a single word (INT / WORD / UINT — 16-bit). Moving a
+    32-bit value into a 16-bit destination truncates the upper word and silently
+    corrupts the value. Use the mnemonic prefix as the primary signal: a 'D'
+    prefix means a 32-bit operand (F1_DMV, F3_DMVN, F8_DMV2, F191_DMV3, F21_DADD,
+    F26_DSUB, F31_DMUL, F33_DDIV, F36_DINC, F38_DDEC, F61_DCMP) and an 'F' prefix
+    means REAL (F309_FMV, F310_FADD, F313_FDIV). Cross-reference these against
+    the declared variable types in the symbol table, and also check the 16-bit
+    forms (F0_MV, F20_ADD, F30_MUL, F32_DIV, MOVE, E_MOVE, :=) for a 32-bit
+    source. Flag each mismatch with the specific source, destination, and rung.
 
   - >
-    Divide-by-zero: Check every division instruction (F32_DIV, F31 %, DIV, the
-    '/' operator, or any scaling/ratio function block that divides). For each
-    divisor, verify it is provably non-zero — either a non-zero constant, or a
-    variable that is guarded by a preceding contact/comparison that guarantees
-    it cannot be zero at the time of the divide. Flag any divide whose divisor
-    is a variable, a data register, or an input that has no zero-check
-    protecting it, since a zero divisor causes a PLC operation error.
+    Divide-by-zero: Check every division instruction — F32_DIV (16-bit),
+    F33_DDIV (32-bit), F313_FDIV (REAL), F52_BDIV and F53_DBDIV (BCD), the IEC
+    DIV and MOD operators, FP_DIV_MOD / FP_DIV_BCD / FP_DIV_MOD_BCD,
+    DIV_TIME_INT / DIV_TIME_DINT / DIV_TIME_REAL, and any scaling or ratio
+    function block that divides internally. For each divisor, verify it is
+    provably non-zero — either a non-zero constant, or a variable guarded by a
+    preceding contact or comparison that guarantees it cannot be zero at the
+    time of the divide. Flag any divide whose divisor is a variable, a data
+    register, or an input with no zero-check protecting it, since a zero divisor
+    raises a PLC operation error.
 
   - >
-    String format integrity: In Panasonic FPWin Pro, a STRING data type stores
-    its maximum length in the first word and its current length in the second
-    word, with character data starting at the third word. Flag any instruction
-    that writes or moves a value into the first two words of a STRING variable
-    (e.g. indexing into the string's underlying words, or a word-level move
-    whose destination overlaps the length header), because overwriting the
-    max-length or current-length words corrupts the string and can cause
-    downstream string operations to read garbage or overrun.
+    String format integrity: In Panasonic FPWin Pro, a STRING stores its maximum
+    length in word 0 and its current length in word 1, with character data
+    starting at word 2. Flag any word-level instruction whose destination
+    overlaps that two-word header — typically F0_MV, F1_DMV, F10_BKMV, F11_COPY,
+    or FP_COPY aimed at a STRING's underlying words, or explicit indexing into
+    the string's word addresses. Overwriting the max-length or current-length
+    word corrupts the string and causes downstream operations (LEN, LEFT,
+    GET_CHAR, FP_FORMAT_STRING, the STRING_TO_* conversions) to read garbage or
+    overrun. Correct practice is to write strings only through the dedicated
+    STRING instructions and the *_TO_STRING conversion family.
 
   # Documentation
   - >
