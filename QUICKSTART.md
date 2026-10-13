@@ -66,19 +66,33 @@ pyinstaller llr.spec
 The bundled executable includes `rules.yaml` and works fully offline
 (only the `--deep` flag requires internet access).
 
+## Browser UI
+
+Prefer a GUI? Skip the command line entirely:
+
+```bash
+llr web
+```
+
+Opens `http://localhost:8080`. Drag an `.asc` file onto the page, choose a
+severity filter, optionally enable Claude deep analysis.
+
 ## Status
 
 | Component | Status |
 |---|---|
 | Data models | ✅ Complete |
+| `.asc` file parser (LD) | ✅ Complete |
 | Rule engine | ✅ Complete |
-| Built-in rules (R001–R010) | ✅ Complete |
+| Built-in rules (R001–R012) | ✅ Complete |
+| Claude deep-analysis rules (19) | ✅ Complete |
 | Claude API client | ✅ Complete |
 | Report formatter (terminal/HTML/JSON) | ✅ Complete |
 | CLI | ✅ Complete |
-| **.asc file parser** | ⏳ **Awaiting sample file** |
+| Browser UI | ✅ Complete |
+| Windows build pipeline | ✅ Complete |
+| Automated tests | ⏳ Not yet |
+| IL / FBD / ST / SFC parsing | ⏳ LD only |
 
-The parser stub accepts any `.asc` file and passes the raw text to Claude
-(`--deep` mode works now). Structured local-rule checks (duplicate coils,
-missing comments per-rung, etc.) require the parser to be completed once
-a real `.asc` sample is provided.
+See [README.md](README.md) for full documentation and [CLAUDE.md](CLAUDE.md)
+for architecture notes and known gotchas.
